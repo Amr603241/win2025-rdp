@@ -1,0 +1,31 @@
+name: Windows Server 2025 RDP
+
+on:
+  workflow_dispatch:
+
+jobs:
+  rdp-session:
+    runs-on: windows-2025
+    timeout-minutes: 360
+
+    steps:
+      - name: Setup Windows User & Enable RDP
+        shell: powershell
+        run: |
+          net user Admin "${{ secrets.RDP_PASSWORD }}" /add
+          net localgroup Administrators Admin /add
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+
+      - name: Install and Connect Tailscale
+        shell: powershell
+        run: |
+          Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi" -OutFile "tailscale.msi"
+          Start-Process msiexec.exe -ArgumentList "/i tailscale.msi /quiet /norestart" -Wait
+          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey="${{ secrets.TAILSCALE_AUTHKEY }}" --hostname="github-win2025" --unattended
+
+      - name: Keep Session Alive
+        shell: powershell
+        run: |
+          Write-Host "Server is ready! Connect via RDP using Tailscale IP for github-win2025"
+          Start-Sleep -Seconds 21500
